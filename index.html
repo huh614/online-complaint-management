@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus | Complaint Management</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Unicons -->
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Particle Background -->
+    <div class="background-container">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="glass-overlay"></div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container"></div>
+
+    <!-- Auth Section -->
+    <section id="auth-section" class="screen active">
+        <div class="auth-container glass-panel reveal">
+            <div class="auth-header">
+                <h2><i class="uil uil-layers"></i> Nexus<span class="accent">CMS</span></h2>
+                <p>Digital Complaint Management System</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form">
+                <div class="input-group">
+                    <i class="uil uil-user icon"></i>
+                    <input type="text" id="login-id" placeholder="User ID" required>
+                </div>
+                <div class="input-group">
+                    <i class="uil uil-lock-alt icon"></i>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                </div>
+                <!-- Role selector logic: Just basic ID check or specific credentials in this mock -->
+                <button type="submit" class="btn btn-primary glow-btn">
+                    <span>Login Securely</span>
+                    <i class="uil uil-arrow-right"></i>
+                </button>
+                <div class="auth-switch">
+                    <span>System Defaults: <br>Admin (admin/admin), Staff (staff/staff)</span>
+                    <button type="button" class="text-btn" onclick="switchAuth('register')">New Citizen? Register Here</button>
+                </div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form hidden">
+                <div class="input-group">
+                    <i class="uil uil-user-plus icon"></i>
+                    <input type="text" id="reg-name" placeholder="Full Name" required>
+                </div>
+                <div class="input-group">
+                    <i class="uil uil-map-marker icon"></i>
+                    <input type="text" id="reg-address" placeholder="Address" required>
+                </div>
+                <div class="input-group">
+                    <i class="uil uil-phone icon"></i>
+                    <input type="tel" id="reg-phone" placeholder="Phone No." required>
+                </div>
+                <div class="input-group">
+                    <i class="uil uil-lock-alt icon"></i>
+                    <input type="password" id="reg-password" placeholder="Set Password" required>
+                </div>
+                <button type="submit" class="btn btn-accent glow-btn">
+                    <span>Create Profile</span>
+                    <i class="uil uil-user-check"></i>
+                </button>
+                <div class="auth-switch">
+                    <button type="button" class="text-btn" onclick="switchAuth('login')"><i class="uil uil-arrow-left"></i> Back to Login</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- Main App Container -->
+    <section id="app-section" class="screen hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <h2>Nexus<span class="accent">CMS</span></h2>
+            </div>
+            
+            <div class="user-profile">
+                <div class="avatar">
+                    <i class="uil uil-user"></i>
+                </div>
+                <div class="user-info">
+                    <h3 id="current-user-name">John Doe</h3>
+                    <span id="current-user-role" class="badge">Citizen</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu" id="nav-menu">
+                <!-- Dynamically populated based on role -->
+            </nav>
+
+            <button class="logout-btn" onclick="logout()">
+                <i class="uil uil-sign-out-alt"></i> Terminate Session
+            </button>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            <header class="topbar glass-panel">
+                <h1 id="page-title">Dashboard</h1>
+                <div id="datetime-pill" class="datetime-pill">--:-- --</div>
+            </header>
+
+            <div class="content-wrapper scroll-custom" id="main-content">
+                <!-- Dynamic Content Renders Here -->
+            </div>
+        </main>
+    </section>
+
+    <!-- Template for Citizen: New Complaint -->
+    <template id="tpl-citizen-new">
+        <div class="component-view reveal">
+            <div class="form-card glass-panel flex-col">
+                <h3>Lodge a New Complaint</h3>
+                <form id="new-complaint-form" onsubmit="submitComplaint(event)">
+                    <div class="input-group">
+                        <label>Category (IS-A Relation)</label>
+                        <select id="comp-type" onchange="updateSubtypeFields()" required>
+                            <option value="">Select Category</option>
+                            <option value="SERVICE">Service Complaint</option>
+                            <option value="PRODUCT">Product Complaint</option>
+                            <option value="INFRA">Infrastructure Complaint</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Subtype Fields per EER -->
+                    <div id="subtype-container" class="subtype-container hidden">
+                        <!-- Injected via JS -->
+                    </div>
+
+                    <div class="input-group">
+                        <label>Detailed Description</label>
+                        <textarea id="comp-desc" rows="4" placeholder="Elaborate on your issue..." required></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary glow-btn full-width mt-4">
+                        <span>Submit to Nexus</span>
+                        <i class="uil uil-cloud-upload"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <!-- Generic Data Table Template -->
+    <template id="tpl-data-table">
+        <div class="component-view reveal">
+            <div class="glass-panel table-container">
+                <table class="neumorphic-table">
+                    <thead id="dt-head"></thead>
+                    <tbody id="dt-body"></tbody>
+                </table>
+                <div id="dt-empty" class="empty-state hidden">
+                    <i class="uil uil-folder-info empty-icon"></i>
+                    <p>No records found in this sector.</p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+</html>
