@@ -1,27 +1,42 @@
 // ===== DATABASE SIMULATION (LocalStorage + EER Models) ===== //
 
 const initDB = () => {
-    if (!localStorage.getItem('nexus_users')) {
+    if (!localStorage.getItem('ltce_users')) {
         const defaultUsers = [
-            { id: 'u1', name: 'System Admin', address: 'Nexus Core', phone: '000-000', role: 'Admin', password: 'admin' },
-            { id: 's1', name: 'Support Staff Alpha', address: 'Desk A', phone: '111-111', role: 'Staff', password: 'staff' },
-            { id: 'c1', name: 'John Doe', address: 'Sector 7G', phone: '555-0199', role: 'Citizen', password: 'password' }
+            { id: 'u1', name: 'System Admin', address: 'LTCE Core', phone: '000-000', role: 'Admin', password: 'admin' },
+            { id: 's1', name: 'Ramesh (Plumber)', address: 'Desk A', phone: '111-111', role: 'Staff', password: 'staff' },
+            { id: 's2', name: 'Suresh (IT Dept)', address: 'Desk B', phone: '222-222', role: 'Staff', password: 'staff2' },
+            { id: 'c1', name: 'Vedant Pawar', address: 'Computer Eng Dept', phone: '999-888', role: 'Citizen', password: 'pass' },
+            { id: 'c2', name: 'Anjali Sharma', address: 'Library Sec', phone: '555-444', role: 'Citizen', password: 'pass' }
         ];
-        localStorage.setItem('nexus_users', JSON.stringify(defaultUsers));
-        localStorage.setItem('nexus_staff', JSON.stringify([{ id: 's1', name: 'Support Staff Alpha', cont_no: '111-111' }]));
-        localStorage.setItem('nexus_complaints', JSON.stringify([
-            { id: 'CMP-1001', date: new Date().toISOString(), type: 'SERVICE', subtype_data: { service_type: 'Network Outage' }, status: 'Pending', userId: 'c1', description: 'Cannot connect to core servers.' }
+        localStorage.setItem('ltce_users', JSON.stringify(defaultUsers));
+        localStorage.setItem('ltce_staff', JSON.stringify([
+            { id: 's1', name: 'Ramesh (Plumber)', cont_no: '111-111' },
+            { id: 's2', name: 'Suresh (IT Dept)', cont_no: '222-222' }
         ]));
-        localStorage.setItem('nexus_responses', JSON.stringify([]));
-        localStorage.setItem('nexus_feedback', JSON.stringify([]));
+        
+        const defaultComplaints = [
+            { id: 'CMP-1001', date: new Date(Date.now() - 86400000 * 2).toISOString(), type: 'SERVICE', subtype_data: { service_type: 'Wi-Fi Outage' }, status: 'Resolved', userId: 'c1', description: 'Lab 4 Wi-Fi completely dropping.' },
+            { id: 'CMP-1002', date: new Date(Date.now() - 86400000).toISOString(), type: 'INFRA', subtype_data: { location: 'B-Wing 2nd Floor' }, status: 'In Progress', userId: 'c2', description: 'Water cooler is leaking heavily.' },
+            { id: 'CMP-1003', date: new Date().toISOString(), type: 'PRODUCT', subtype_data: { product_name: 'Projector' }, status: 'Pending', userId: 'c1', description: 'Projector bulb burned out in Room 302.' }
+        ];
+        localStorage.setItem('ltce_complaints', JSON.stringify(defaultComplaints));
+        
+        localStorage.setItem('ltce_responses', JSON.stringify([
+            { id: 'RSP-882', complaintId: 'CMP-1001', staffId: 's2', date: new Date(Date.now() - 86400000).toISOString(), text: 'Router restarted and firmware updated. Signal stable.' }
+        ]));
+        
+        localStorage.setItem('ltce_feedback', JSON.stringify([
+            { id: 'FB-104', responseId: 'RSP-882', rating: 5, comments: 'Extremely fast resolution. Thank you!' }
+        ]));
     }
 };
 
-const getDB = (table) => JSON.parse(localStorage.getItem(`nexus_${table}`)) || [];
-const saveDB = (table, data) => localStorage.setItem(`nexus_${table}`, JSON.stringify(data));
+const getDB = (table) => JSON.parse(localStorage.getItem(`ltce_${table}`)) || [];
+const saveDB = (table, data) => localStorage.setItem(`ltce_${table}`, JSON.stringify(data));
 
 // ===== GLOBAL STATE ===== //
-let currentUser = JSON.parse(sessionStorage.getItem('nexus_session')) || null;
+let currentUser = JSON.parse(sessionStorage.getItem('ltce_session')) || null;
 
 // ===== INITIALIZATION ===== //
 document.addEventListener("DOMContentLoaded", () => {
@@ -88,7 +103,7 @@ function handleLogin(e) {
 
     if (user) {
         currentUser = user;
-        sessionStorage.setItem('nexus_session', JSON.stringify(user));
+        sessionStorage.setItem('ltce_session', JSON.stringify(user));
         showToast('Authentication Successful');
         showApp();
     } else {
@@ -118,7 +133,7 @@ function handleRegister(e) {
 
 function logout() {
     currentUser = null;
-    sessionStorage.removeItem('nexus_session');
+    sessionStorage.removeItem('ltce_session');
     switchScreen('auth-section');
     showToast('Session Terminated');
 }
@@ -240,7 +255,7 @@ function submitComplaint(e) {
     });
     
     saveDB('complaints', complaints);
-    showToast('Complaint Submitted the Nexus Network.');
+    showToast('Complaint Submitted to LTCE Records.');
     loadCitizenDashboard();
     
     // Reset nav
@@ -407,21 +422,48 @@ function provideResponse(cmpId) {
 
 // ===== ADMIN FUNCTIONS ===== //
 function loadAdminDashboard() {
-    setPageTitle("Global Complaint Overview");
-    renderContent(document.getElementById('tpl-data-table').innerHTML);
+    setPageTitle("Global Complaint Analytics & Overview");
     
     const complaints = getDB('complaints');
+    
+    // Analytics Metrics Feature
+    const resolved = complaints.filter(c => c.status === 'Resolved').length;
+    const pending = complaints.filter(c => c.status === 'Pending').length;
+    const progress = complaints.filter(c => c.status === 'In Progress').length;
+
+    let analyticsHtml = `
+        <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem;" class="reveal">
+            <div class="glass-panel" style="flex:1;padding:1.5rem;text-align:center;">
+                <h4 style="color:var(--text-muted);margin-bottom:0.5rem;">Total Complaints</h4>
+                <h2 style="font-size:2rem;color:var(--accent-neon);">${complaints.length}</h2>
+            </div>
+            <div class="glass-panel" style="flex:1;padding:1.5rem;text-align:center;">
+                <h4 style="color:var(--text-muted);margin-bottom:0.5rem;">Pending</h4>
+                <h2 style="font-size:2rem;color:var(--status-pending);">${pending}</h2>
+            </div>
+            <div class="glass-panel" style="flex:1;padding:1.5rem;text-align:center;">
+                <h4 style="color:var(--text-muted);margin-bottom:0.5rem;">Resolved</h4>
+                <h2 style="font-size:2rem;color:var(--status-resolved);">${resolved}</h2>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom: 1rem;" class="reveal">
+            <button class="btn btn-outline" onclick="window.print()"><i class="uil uil-print"></i> Generate PDF Report</button>
+        </div>
+    `;
+
+    renderContent(analyticsHtml + document.getElementById('tpl-data-table').innerHTML);
+    
     const dtHead = document.getElementById('dt-head');
     const dtBody = document.getElementById('dt-body');
     
     dtHead.innerHTML = `
         <tr>
             <th>Ticket</th>
-            <th>User ID</th>
+            <th>Reporter ID</th>
             <th>Category</th>
-            <th>Date</th>
+            <th>Logged Date</th>
             <th>Status</th>
-            <th>Act</th>
+            <th>Manage</th>
         </tr>
     `;
 
@@ -449,7 +491,7 @@ function loadAdminDashboard() {
 }
 
 function adminDelete(id) {
-    if(confirm('Eradicate this record from the Nexus database?')) {
+    if(confirm('Permanently eradicate this record from LTCE database?')) {
         let complaints = getDB('complaints');
         complaints = complaints.filter(c => c.id !== id);
         saveDB('complaints', complaints);
