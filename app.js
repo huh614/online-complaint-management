@@ -1,46 +1,29 @@
-// ===== DATABASE SIMULATION (LocalStorage + EER Models) ===== //
+// ===== API UTILITIES ===== //
+const API_URL = 'http://localhost:5000/api';
 
-const initDB = () => {
-    if (!localStorage.getItem('ltce_users')) {
-        const defaultUsers = [
-            { id: 'u1', name: 'System Admin', address: 'LTCE Core', phone: '000-000', role: 'Admin', password: 'admin' },
-            { id: 's1', name: 'Ramesh (Plumber)', address: 'Desk A', phone: '111-111', role: 'Staff', password: 'staff' },
-            { id: 's2', name: 'Suresh (IT Dept)', address: 'Desk B', phone: '222-222', role: 'Staff', password: 'staff2' },
-            { id: 'c1', name: 'Vedant Pawar', address: 'Computer Eng Dept', phone: '999-888', role: 'Citizen', password: 'pass' },
-            { id: 'c2', name: 'Anjali Sharma', address: 'Library Sec', phone: '555-444', role: 'Citizen', password: 'pass' }
-        ];
-        localStorage.setItem('ltce_users', JSON.stringify(defaultUsers));
-        localStorage.setItem('ltce_staff', JSON.stringify([
-            { id: 's1', name: 'Ramesh (Plumber)', cont_no: '111-111' },
-            { id: 's2', name: 'Suresh (IT Dept)', cont_no: '222-222' }
-        ]));
-        
-        const defaultComplaints = [
-            { id: 'CMP-1001', date: new Date(Date.now() - 86400000 * 2).toISOString(), type: 'SERVICE', subtype_data: { service_type: 'Wi-Fi Outage' }, status: 'Resolved', userId: 'c1', description: 'Lab 4 Wi-Fi completely dropping.' },
-            { id: 'CMP-1002', date: new Date(Date.now() - 86400000).toISOString(), type: 'INFRA', subtype_data: { location: 'B-Wing 2nd Floor' }, status: 'In Progress', userId: 'c2', description: 'Water cooler is leaking heavily.' },
-            { id: 'CMP-1003', date: new Date().toISOString(), type: 'PRODUCT', subtype_data: { product_name: 'Projector' }, status: 'Pending', userId: 'c1', description: 'Projector bulb burned out in Room 302.' }
-        ];
-        localStorage.setItem('ltce_complaints', JSON.stringify(defaultComplaints));
-        
-        localStorage.setItem('ltce_responses', JSON.stringify([
-            { id: 'RSP-882', complaintId: 'CMP-1001', staffId: 's2', date: new Date(Date.now() - 86400000).toISOString(), text: 'Router restarted and firmware updated. Signal stable.' }
-        ]));
-        
-        localStorage.setItem('ltce_feedback', JSON.stringify([
-            { id: 'FB-104', responseId: 'RSP-882', rating: 5, comments: 'Extremely fast resolution. Thank you!' }
-        ]));
+async function apiFetch(endpoint, options = {}) {
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+        if (!response.ok) throw new Error('API Error');
+        return await response.json();
+    } catch (error) {
+        console.error('Fetch error:', error);
+        showToast('Connection to server failed', 'error');
+        return null;
     }
-};
-
-const getDB = (table) => JSON.parse(localStorage.getItem(`ltce_${table}`)) || [];
-const saveDB = (table, data) => localStorage.setItem(`ltce_${table}`, JSON.stringify(data));
+}
 
 // ===== GLOBAL STATE ===== //
 let currentUser = JSON.parse(sessionStorage.getItem('ltce_session')) || null;
 
 // ===== INITIALIZATION ===== //
 document.addEventListener("DOMContentLoaded", () => {
-    initDB();
     updateClock();
     setInterval(updateClock, 1000);
 
@@ -87,23 +70,19 @@ function switchAuth(type) {
 }
 
 // ===== AUTHENTICATION ===== //
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     const id = document.getElementById('login-id').value;
     const pass = document.getElementById('login-password').value;
     
-    const users = getDB('users');
-    let user = null;
-    
-    // Check ID first
-    user = users.find(u => u.id === id && u.password === pass);
-    
-    // Fallback: allow login using rolename for demo
-    if (!user) user = users.find(u => u.role.toLowerCase() === id.toLowerCase() && u.password === pass);
+    const result = await apiFetch('/login', {
+        method: 'POST',
+        body: JSON.stringify({ id, password: pass })
+    });
 
-    if (user) {
-        currentUser = user;
-        sessionStorage.setItem('ltce_session', JSON.stringify(user));
+    if (result && result.success) {
+        currentUser = result.user;
+        sessionStorage.setItem('ltce_session', JSON.stringify(result.user));
         showToast('Authentication Successful');
         showApp();
     } else {
@@ -111,24 +90,25 @@ function handleLogin(e) {
     }
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
     e.preventDefault();
     const name = document.getElementById('reg-name').value;
     const address = document.getElementById('reg-address').value;
     const phone = document.getElementById('reg-phone').value;
     const pass = document.getElementById('reg-password').value;
 
-    const users = getDB('users');
-    const newId = 'c' + (users.filter(u => u.role === 'Citizen').length + 1);
-    
-    const newUser = { id: newId, name, address, phone, role: 'Citizen', password: pass };
-    users.push(newUser);
-    saveDB('users', users);
+    const result = await apiFetch('/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, address, phone, password: pass })
+    });
 
-    showToast(`Registered successfully. Your User ID is ${newId}`);
-    switchAuth('login');
-    document.getElementById('login-id').value = newId;
-    document.getElementById('login-password').value = pass;
+    if (result && result.success) {
+        const newUser = result.user;
+        showToast(`Registered successfully. Your User ID is ${newUser.id}`);
+        switchAuth('login');
+        document.getElementById('login-id').value = newUser.id;
+        document.getElementById('login-password').value = pass;
+    }
 }
 
 function logout() {
@@ -230,7 +210,7 @@ function updateSubtypeFields() {
     }
 }
 
-function submitComplaint(e) {
+async function submitComplaint(e) {
     e.preventDefault();
     const type = document.getElementById('comp-type').value;
     const subtypeVal = document.getElementById('subtype-val').value;
@@ -241,35 +221,37 @@ function submitComplaint(e) {
     if(type === 'PRODUCT') subtype_data.product_name = subtypeVal;
     if(type === 'INFRA') subtype_data.location = subtypeVal;
 
-    const complaints = getDB('complaints');
-    const newId = `CMP-${1000 + complaints.length + 1}`;
-    
-    complaints.push({
-        id: newId,
-        userId: currentUser.id,
-        date: new Date().toISOString(),
-        type,
-        subtype_data,
-        status: 'Pending',
-        description: desc
+    const result = await apiFetch('/complaints', {
+        method: 'POST',
+        body: JSON.stringify({
+            userId: currentUser.id,
+            type,
+            subtype_data,
+            description: desc
+        })
     });
     
-    saveDB('complaints', complaints);
-    showToast('Complaint Submitted to LTCE Records.');
-    loadCitizenDashboard();
-    
-    // Reset nav
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item')[1].classList.add('active'); // select history
+    if (result && result.success) {
+        showToast('Complaint Submitted to LTCE Records.');
+        loadCitizenDashboard();
+        
+        // Reset nav
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        if (document.querySelectorAll('.nav-item')[1]) {
+            document.querySelectorAll('.nav-item')[1].classList.add('active'); // select history
+        }
+    }
 }
 
-function loadCitizenDashboard() {
+async function loadCitizenDashboard() {
     setPageTitle("My Complaints");
     renderContent(document.getElementById('tpl-data-table').innerHTML);
     
-    const complaints = getDB('complaints').filter(c => c.userId === currentUser.id);
-    const responses = getDB('responses');
-    const feedbacks = getDB('feedback');
+    const complaints = await apiFetch(`/complaints?userId=${currentUser.id}&role=Citizen`);
+    const responses = await apiFetch('/responses');
+    const feedbacks = await apiFetch('/feedback');
+
+    if (!complaints) return;
 
     const dtHead = document.getElementById('dt-head');
     const dtBody = document.getElementById('dt-body');
@@ -322,7 +304,7 @@ function loadCitizenDashboard() {
     });
 }
 
-function showFeedbackDialog(respId, cmpId) {
+async function showFeedbackDialog(respId, cmpId) {
     const rating = prompt(`Score the response for ${cmpId} (1-5):`, "5");
     if(!rating || isNaN(rating) || rating < 1 || rating > 5) {
         showToast('Valid rating required betwen 1-5', 'error');
@@ -330,26 +312,32 @@ function showFeedbackDialog(respId, cmpId) {
     }
     const comments = prompt("Any additional comments?");
     
-    const feed = getDB('feedback');
-    feed.push({
-        id: `FB-${Math.floor(Math.random()*1000)}`,
-        responseId: respId,
-        rating: parseInt(rating),
-        comments: comments || ''
+    const result = await apiFetch('/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+            responseId: respId,
+            rating: parseInt(rating),
+            comments: comments || ''
+        })
     });
-    saveDB('feedback', feed);
-    showToast('Feedback stored successfully.');
-    loadCitizenDashboard();
+
+    if (result && result.success) {
+        showToast('Feedback stored successfully.');
+        loadCitizenDashboard();
+    }
 }
 
 // ===== STAFF FUNCTIONS ===== //
-function loadStaffDashboard() {
+async function loadStaffDashboard() {
     setPageTitle("Assigned Task Queue");
     renderContent(document.getElementById('tpl-data-table').innerHTML);
     
-    // For demo, standard staff sees all pending or progress complaints
-    const complaints = getDB('complaints').filter(c => c.status !== 'Dismissed');
-    const responses = getDB('responses');
+    const complaints = await apiFetch('/complaints');
+    const responses = await apiFetch('/responses');
+
+    if (!complaints) return;
+
+    const filtered = complaints.filter(c => c.status !== 'Dismissed');
 
     const dtHead = document.getElementById('dt-head');
     const dtBody = document.getElementById('dt-body');
@@ -391,40 +379,43 @@ function loadStaffDashboard() {
     });
 }
 
-function updateStatus(cmpId, status) {
-    const complaints = getDB('complaints');
-    let c = complaints.find(x => x.id === cmpId);
-    if(c){
-        c.status = status;
-        saveDB('complaints', complaints);
+async function updateStatus(cmpId, status) {
+    const result = await apiFetch(`/complaints/${cmpId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status })
+    });
+    if (result && result.success) {
         showToast(`Status updated to ${status}`);
-        loadStaffDashboard();
+        if(currentUser.role === 'Staff') loadStaffDashboard();
+        else loadAdminDashboard();
     }
 }
 
-function provideResponse(cmpId) {
+async function provideResponse(cmpId) {
     const text = prompt(`Enter resolution response for ${cmpId}:`);
     if(!text) return;
 
-    const resps = getDB('responses');
-    resps.push({
-        id: `RSP-${Math.floor(Math.random()*1000)}`,
-        complaintId: cmpId,
-        staffId: currentUser.id,
-        date: new Date().toISOString(),
-        text: text
+    const result = await apiFetch('/responses', {
+        method: 'POST',
+        body: JSON.stringify({
+            complaintId: cmpId,
+            staffId: currentUser.id,
+            text: text
+        })
     });
-    saveDB('responses', resps);
 
-    // Auto resolve
-    updateStatus(cmpId, 'Resolved'); 
+    if (result && result.success) {
+        // Auto resolve
+        await updateStatus(cmpId, 'Resolved'); 
+    }
 }
 
 // ===== ADMIN FUNCTIONS ===== //
-function loadAdminDashboard() {
+async function loadAdminDashboard() {
     setPageTitle("Global Complaint Analytics & Overview");
     
-    const complaints = getDB('complaints');
+    const complaints = await apiFetch('/complaints');
+    if (!complaints) return;
     
     // Analytics Metrics Feature
     const resolved = complaints.filter(c => c.status === 'Resolved').length;
@@ -490,21 +481,23 @@ function loadAdminDashboard() {
     });
 }
 
-function adminDelete(id) {
+async function adminDelete(id) {
     if(confirm('Permanently eradicate this record from LTCE database?')) {
-        let complaints = getDB('complaints');
-        complaints = complaints.filter(c => c.id !== id);
-        saveDB('complaints', complaints);
-        showToast('Record Purged');
-        loadAdminDashboard();
+        const result = await apiFetch(`/complaints/${id}`, { method: 'DELETE' });
+        if (result && result.success) {
+            showToast('Record Purged');
+            loadAdminDashboard();
+        }
     }
 }
 
-function loadAdminUsers() {
+async function loadAdminUsers() {
     setPageTitle("System Users");
     renderContent(document.getElementById('tpl-data-table').innerHTML);
     
-    const users = getDB('users');
+    const users = await apiFetch('/users');
+    if (!users) return;
+
     const dtHead = document.getElementById('dt-head');
     const dtBody = document.getElementById('dt-body');
     
